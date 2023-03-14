@@ -144,24 +144,11 @@ def get_data(dataset_path, output_dir):
         path = os.path.join(corpus_path, dir)
         if os.path.isdir(path):
             event, ent, sent, voc = get_data_from_dir(path)
-            events.extend( event)
+            events.extend(event)
             entities.extend(ent)
             sentences.extend(sent)
 
             vocab.update(voc)
-
-    with open(os.path.join(output_dir, 'event_gold_mentions.json'), 'w+') as f:
-        json.dump(events, f)
-
-    with open(os.path.join(output_dir, 'entity_gold_mentions.json'), 'w+') as f:
-        json.dump(entities, f)
-
-    with open(os.path.join(output_dir, 'sentences.json'), 'w+') as f:
-        json.dump(sentences, f)
-
-    with open(os.path.join(output_dir, 'vocab.txt'), 'w') as f:
-        for word in vocab:
-            f.write(word + '\n')
 
     return events, entities, sentences, vocab
 
@@ -184,12 +171,24 @@ def prepare_dataset(args):
         raise Exception("ECB+ dataset not found in data directory")
 
     try:
-        subprocess.run(['unzip', '-o', zip_path, '-d', os.path.join(DATA_DIR, 'ECB+_LREC2014')],
-                       shell=True, stdout=subprocess.DEVNULL)
+        subprocess.run(['unzip', '-o', zip_path, '-d', os.path.join(DATA_DIR, 'ECB+_LREC2014')])
     except subprocess.CalledProcessError as e:
         raise Exception("Error while unzipping ECB+ dataset")
 
-    train, test, dev, vocab = get_data(dataset_path, output_dir)
+    events, entities, sentences, vocab = get_data(dataset_path, output_dir)
+
+    with open(os.path.join(output_dir, 'event_gold_mentions.json'), 'w+') as f:
+        json.dump(events, f)
+
+    with open(os.path.join(output_dir, 'entity_gold_mentions.json'), 'w+') as f:
+        json.dump(entities, f)
+
+    with open(os.path.join(output_dir, 'sentences.json'), 'w+') as f:
+        json.dump(sentences, f)
+
+    with open(os.path.join(output_dir, 'vocab.txt'), 'w') as f:
+        for word in vocab:
+            f.write(word + '\n')
 
 
 if __name__ == '__main__':
