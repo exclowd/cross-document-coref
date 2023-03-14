@@ -1,0 +1,3 @@
+[submodule "data/ecbPlus"]
+	path = data/ecbPlus
+	url = https://github.com/cltl/ecbPlus.git
