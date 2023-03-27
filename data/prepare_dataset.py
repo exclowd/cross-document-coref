@@ -173,7 +173,7 @@ def prepare_dataset():
         raise Exception("ECB+ dataset not found in data directory")
 
     try:
-        subprocess.run(['unzip', '-o', zip_path, '-d', dataset_path])
+        subprocess.run(['unzip', '-o', zip_path, '-d', dataset_path], shell=True, stdout=subprocess.DEVNULL)
     except subprocess.CalledProcessError as e:
         raise Exception("Error while unzipping ECB+ dataset")
 
@@ -193,12 +193,12 @@ def prepare_dataset():
             f.write(word + '\n')
 
 
-@hydra.main(version_base=None, config_path="conf", config_name="config")
+@hydra.main(version_base=None, config_path="../conf", config_name="train")
 def main(cfg: DictConfig):
-    print(OmegaConf.to_yaml(cfg))
     global DATASET_PATH, OUTPUT_DIR
     DATASET_PATH = cfg['dataset']['path']
     OUTPUT_DIR = cfg['dataset']['output']
+    print(DATASET_PATH, OUTPUT_DIR)
     prepare_dataset()
 
 

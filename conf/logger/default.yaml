@@ -1,0 +1,1 @@
+log_dir: ${paths.log_dir}

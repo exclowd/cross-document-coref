@@ -161,3 +161,5 @@ cython_debug/
 
 outputs
 data/ecbPlus_conll
+
+logs/
