@@ -1,13 +1,14 @@
-import argparse
 import glob
 import json
-import subprocess
 import os
+import subprocess
 import xml.etree.ElementTree as ET
 
+import hydra
+from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
-DATA_DIR = "./data/ecbPlus"
+DATASET_PATH = "./data/ecbPlus"
 OUTPUT_DIR = "./data/ecbPlusOut"
 
 
@@ -140,8 +141,8 @@ def get_data(dataset_path, output_dir):
 
     corpus_path = os.path.join(dataset_path, 'ECB+')
 
-    for dir in tqdm(os.listdir(corpus_path)):
-        path = os.path.join(corpus_path, dir)
+    for directory in tqdm(os.listdir(corpus_path)):
+        path = os.path.join(corpus_path, directory)
         if os.path.isdir(path):
             event, ent, sent, voc = get_data_from_dir(path)
             events.extend(event)
@@ -153,10 +154,11 @@ def get_data(dataset_path, output_dir):
     return events, entities, sentences, vocab
 
 
-def prepare_dataset(args):
-    data_dir = args.data_dir
-    output_dir = args.output_dir
+def prepare_dataset():
     # check if data directory exists
+    data_dir = DATASET_PATH
+    output_dir = OUTPUT_DIR
+
     if not (os.path.exists(data_dir) and os.path.isdir(data_dir)):
         raise Exception("Data directory does not exist")
 
@@ -165,13 +167,13 @@ def prepare_dataset(args):
         os.makedirs(output_dir)
 
     dataset_path = os.path.join(data_dir, 'ECB+_LREC2014')
-    zip_path = os.path.join(DATA_DIR, 'ECB+_LREC2014', 'ECB+.zip')
+    zip_path = os.path.join(data_dir, 'ECB+_LREC2014', 'ECB+.zip')
 
     if not os.path.exists(zip_path):
         raise Exception("ECB+ dataset not found in data directory")
 
     try:
-        subprocess.run(['unzip', '-o', zip_path, '-d', os.path.join(DATA_DIR, 'ECB+_LREC2014')])
+        subprocess.run(['unzip', '-o', zip_path, '-d', dataset_path])
     except subprocess.CalledProcessError as e:
         raise Exception("Error while unzipping ECB+ dataset")
 
@@ -191,13 +193,14 @@ def prepare_dataset(args):
             f.write(word + '\n')
 
 
+@hydra.main(version_base=None, config_path="conf", config_name="config")
+def main(cfg: DictConfig):
+    print(OmegaConf.to_yaml(cfg))
+    global DATASET_PATH, OUTPUT_DIR
+    DATASET_PATH = cfg['dataset']['path']
+    OUTPUT_DIR = cfg['dataset']['output']
+    prepare_dataset()
+
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        prog='prepare_dataset.py',
-        description='Prepare ECB+ dataset for training and testing',
-        epilog='Example: python prepare_dataset.py --data-dir ./data/ecbPlus --output-dir ./data/ecbPlusOut'
-    )
-    parser.add_argument('--data-dir', type=str, default=DATA_DIR, help='Path to ECB+ dataset')
-    parser.add_argument('--output-dir', type=str, default=OUTPUT_DIR, help='Path to output directory')
-    arguments = parser.parse_args()
-    prepare_dataset(arguments)
+    main()
