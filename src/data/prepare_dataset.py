@@ -5,14 +5,12 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 import hydra
+import numpy as np
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
-DATASET_PATH = "./data/ecbPlus"
-OUTPUT_DIR = "./data/ecbPlusOut"
 
-
-def get_data_from_file(topic, file):
+def get_data_from_file(file, sentences):
     tree = ET.parse(file)
     root = tree.getroot()
 
@@ -58,7 +56,6 @@ def get_data_from_file(topic, file):
 
             m = {
                 'doc_id': root.attrib.get('doc_id'),
-                'topic': topic,
                 'type': mention_type,
                 'sent_id': sentence,
                 'm_id': mention.attrib.get('m_id'),
@@ -117,48 +114,71 @@ def get_data_from_file(topic, file):
     return event_mentions, entity_mentions, list(sentence_dict.values()), vocab
 
 
-def get_data_from_dir(path):
+def get_clusters(mentions):
+    clusters = {}
+    for i, mention in enumerate(mentions):
+        cluster_id = mention['coref_chain']
+        clusters[cluster_id] = clusters.get(cluster_id, list).append(i)
+
+    return clusters
+
+
+def get_data_from_topic(topic, topic_path, validated_sentences):
     event_mentions = []
     entity_mentions = []
-    sentences = []
-    vocab = set()
 
-    for file in glob.glob(os.path.join(path, '*.xml')):
-        event, ent, sent, voc = get_data_from_file(os.path.basename(path), file)
-        event_mentions.extend(event)
-        entity_mentions.extend(ent)
-        sentences.extend(sent)
-        vocab.update(voc)
+    for file_path in glob.glob(os.path.join(topic_path, '*.xml')):
+        file = os.path.basename(file_path)
+        if file in validated_sentences:
+            selected_sentences = list(map(int, validated_sentences[file]))
+            print(file, validated_sentences[file])
+            event_mentions, entity_mentions = get_data_from_file(file_path, selected_sentences)
+            event_mentions.extend(event_mentions)
+            entity_mentions.extend(entity_mentions)
 
-    return event_mentions, entity_mentions, sentences, vocab
+    event_clusters = get_clusters(event_mentions)
+    entity_clusters = get_clusters(entity_mentions)
+
+    event_singleton_cluster_flag = {c: True if len(m) == 1 else False for c, m in event_clusters.items()}
+    entity_singleton_cluster_flag = {c: True if len(m) == 1 else False for c, m in entity_clusters.items()}
+
+    for item in event_mentions:
+        item.update({'topic': topic, 'singleton': event_singleton_cluster_flag[item['cluster_id']]})
+    for item in entity_mentions:
+        item.update({'topic': topic, 'singleton': entity_singleton_cluster_flag[item['cluster_id']]})
+
+    return event_mentions, entity_mentions
 
 
-def get_data(dataset_path, output_dir):
+def get_data(data_dir, validated_sentences):
     events = []
     entities = []
-    sentences = []
-    vocab = set()
 
-    corpus_path = os.path.join(dataset_path, 'ECB+')
+    corpus_path = os.path.join(data_dir, 'ECB+')
 
-    for directory in tqdm(os.listdir(corpus_path)):
-        path = os.path.join(corpus_path, directory)
-        if os.path.isdir(path):
-            event, ent, sent, voc = get_data_from_dir(path)
-            events.extend(event)
-            entities.extend(ent)
-            sentences.extend(sent)
-
-            vocab.update(voc)
-
-    return events, entities, sentences, vocab
+    for topic in os.listdir(corpus_path):
+        topic_dir = os.path.join(corpus_path, topic)
+        if os.path.isdir(topic_dir):
+            print(f"Processing {topic_dir}")
+            event_mentions, entity_mentions = get_data_from_topic(topic, topic_dir, validated_sentences[topic])
+            events.extend(event_mentions)
+            entities.extend(entity_mentions)
 
 
-def prepare_dataset():
+def get_annotated_sentences(annotated_sentences):
+    sentences = {}
+    for topic, doc, sentence in annotated_sentences:
+        if topic not in sentences:
+            sentences[topic] = {}
+        doc_name = f"{topic}_{doc}.xml"
+        if doc_name not in sentences[topic]:
+            sentences[topic][doc_name] = []
+        sentences[topic][doc_name].append(sentence)
+    return sentences
+
+
+def prepare_dataset(data_dir: str, output_dir: str) -> None:
     # check if data directory exists
-    data_dir = DATASET_PATH
-    output_dir = OUTPUT_DIR
-
     if not (os.path.exists(data_dir) and os.path.isdir(data_dir)):
         raise Exception("Data directory does not exist")
 
@@ -177,7 +197,12 @@ def prepare_dataset():
     except subprocess.CalledProcessError as e:
         raise Exception("Error while unzipping ECB+ dataset")
 
-    events, entities, sentences, vocab = get_data(dataset_path, output_dir)
+    validated_sentences = np.genfromtxt(os.path.join(dataset_path, 'ECBplus_coreference_sentences.csv'),
+                                        delimiter=',', dtype=str, skip_header=1)
+
+    validated_sentences = get_annotated_sentences(validated_sentences)
+
+    events, entities, sentences, vocab = get_data(dataset_path, validated_sentences)
 
     with open(os.path.join(output_dir, 'event_gold_mentions.json'), 'w+') as f:
         json.dump(events, f)
@@ -193,13 +218,11 @@ def prepare_dataset():
             f.write(word + '\n')
 
 
-@hydra.main(version_base=None, config_path="../conf", config_name="train")
+@hydra.main(version_base=None, config_path="../../conf", config_name="train")
 def main(cfg: DictConfig):
-    global DATASET_PATH, OUTPUT_DIR
-    DATASET_PATH = cfg['dataset']['path']
-    OUTPUT_DIR = cfg['dataset']['output']
-    print(DATASET_PATH, OUTPUT_DIR)
-    prepare_dataset()
+    data_dir = cfg['dataset']['path']
+    output_dir = cfg['dataset']['output']
+    prepare_dataset(data_dir, output_dir)
 
 
 if __name__ == '__main__':
