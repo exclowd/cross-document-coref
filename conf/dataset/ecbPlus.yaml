@@ -1,2 +1,3 @@
-path: ./data/ecbPlus
-output: ./data/ecbPlus_prep
+_target_: src.data.ecbplus.ECBPlusDataModule
+path: ${paths.data_dir}/ecbPlus
+output: ${paths.data_dir}/ecbPlus_prep
