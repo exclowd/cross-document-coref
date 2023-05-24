@@ -1,0 +1,16 @@
+
+[class^="entity"] {
+	display: inline-block;
+	background-color: #fff;
+	border-radius: 5px;
+	box-shadow: 0 0 5px #000;
+	padding: 5px;
+	margin: 5px;
+}
+
+.entity1:hover {
+	background-color: #f00;
+}
+
+/* generate the above for all the classes from entity2 till enitity43 with random colors */
+
